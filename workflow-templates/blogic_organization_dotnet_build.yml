@@ -1,0 +1,79 @@
+
+# This blogic dotnet workflow
+name: BLogic Organization CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+    
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # job cheking out, reading project meta file and creating folders for further processing
+  ci-build:
+  
+    # The type of runner that the job will run on
+    runs-on: [self-hosted, .net]
+      
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it      
+      - name: Checkout code        
+        uses: actions/checkout@v3.0.2 
+        with:
+          submodules: 'false'
+          #token: '69603ffe093532b2fe26cdad3908b9fc2e9b396e'        
+             
+      # read meta file
+      - name: read project meta file
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\meta.ps1" -MetaFilePath %GITHUB_WORKSPACE%\ProjectMeta.json -Verbose
+        shell: cmd
+        
+      # read meta file
+      - name: prepear workspace
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\prepear.ps1" -Verbose
+        shell: cmd
+        
+      # restore nuget packages
+      - name: restore nuget packages
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\restore.ps1" -Verbose
+        shell: cmd
+
+      # get version
+      - name: get next version
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\version.ps1" -Verbose
+        shell: cmd
+        
+      # build solution
+      - name: build solution
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\build.ps1" -Verbose
+        shell: cmd
+
+      # test solution
+      - name: test solution
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\test.ps1" -Verbose
+        shell: cmd
+             
+      # publish solution
+      - name: publish
+        run: powershell.exe -File "%RUNNER_TOOL_CACHE%\BuildScripts\Powershell\publish.ps1" -Verbose
+        shell: cmd
+        
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3.1.0
+        with:    
+          name: msi, test result, coverage result
+          path: | 
+            ${{github.GITHUB_WORKSPACE}}\drops\wix\*.msi            
+          if-no-files-found: ignore    
+          retention-days: 15
+
+      - name: Clean after
+        uses: mickem/clean-after-action@v1.1.1  
+        if: always()
